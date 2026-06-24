@@ -91,30 +91,35 @@ function loadFrame(i) {
 }
 
 async function preload() {
-  let loaded = 0;
-  const bump = () => {
-    loaded++;
-    const pct = Math.round((loaded / FRAME_COUNT) * 100);
-    barFill.style.width = pct + "%";
-    percentEl.textContent = pct + "%";
-  };
+  // Phase 1 — load a head of frames (in parallel) for a fast first paint.
+  // The loader bar tracks ONLY this head, so it fills to 100% in ~1-2s and the
+  // experience is revealed immediately; the rest of the frames stream in after.
+  const head = Math.min(20, FRAME_COUNT);
+  let done1 = 0;
+  await Promise.all(
+    Array.from({ length: head }, (_, i) =>
+      loadFrame(i).then(() => {
+        done1++;
+        const pct = Math.round((done1 / head) * 100);
+        barFill.style.width = pct + "%";
+        percentEl.textContent = pct + "%";
+      })
+    )
+  );
 
-  // Phase 1 — first 12 frames for instant first paint
-  const head = 12;
-  for (let i = 0; i < head; i++) { await loadFrame(i); bump(); }
   drawFrame(0, true);
   start();
+  setTimeout(() => loaderEl.classList.add("done"), 200);
 
-  // Phase 2 — remaining frames in parallel batches
+  // Phase 2 — remaining frames stream in the background (non-blocking).
   const rest = [];
   for (let i = head; i < FRAME_COUNT; i++) rest.push(i);
-  const BATCH = 16;
-  for (let i = 0; i < rest.length; i += BATCH) {
-    await Promise.all(rest.slice(i, i + BATCH).map((idx) => loadFrame(idx).then(bump)));
-  }
-
-  // hide loader once everything is ready
-  setTimeout(() => loaderEl.classList.add("done"), 250);
+  const BATCH = 32;
+  (async () => {
+    for (let i = 0; i < rest.length; i += BATCH) {
+      await Promise.all(rest.slice(i, i + BATCH).map((idx) => loadFrame(idx)));
+    }
+  })();
 }
 
 /* ============================================================
