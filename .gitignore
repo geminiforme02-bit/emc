@@ -1,0 +1,12 @@
+# dependencies (puppeteer-core, dev only — reinstall with `npm install`)
+node_modules/
+
+# local dev artifacts
+server.log
+temporary screenshots/
+_*.mjs
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
